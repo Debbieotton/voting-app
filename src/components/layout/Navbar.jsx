@@ -1,6 +1,6 @@
 import React from 'react'
 
-const Navbar = ({ user, onSignOut, onNavigate }) => {
+const Navbar = ({ onSignOut, onNavigate }) => {
   return (
     <nav className="navbar">
       <div className="nav-container">
@@ -12,7 +12,7 @@ const Navbar = ({ user, onSignOut, onNavigate }) => {
             Home
           </button>
           <button className="nav-btn" onClick={() => onNavigate('vote')}>
-            Vote
+            Create Vote
           </button>
           <button className="nav-btn" onClick={() => onNavigate('profile')}>
             Profile

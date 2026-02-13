@@ -1,6 +1,36 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 const Profile = ({ user }) => {
+  const [stats, setStats] = useState({
+    votesCreated: 0,
+    votesParticipated: 0,
+    activities: []
+  })
+
+  useEffect(() => {
+    if (user?.email) {
+      const allPolls = JSON.parse(localStorage.getItem('allPolls') || '[]')
+      const userVotes = JSON.parse(localStorage.getItem(`votes_${user.email}`) || '{}')
+      const activities = JSON.parse(localStorage.getItem(`activities_${user.email}`) || '[]')
+      
+      const votesCreated = allPolls.filter(p => p.createdBy === user.email).length
+      const votesParticipated = Object.values(userVotes).filter(v => v.hasVoted).length
+
+      setStats({
+        votesCreated,
+        votesParticipated,
+        activities
+      })
+    }
+  }, [user])
+
+  const calculateParticipation = () => {
+    if (stats.votesCreated === 0 && stats.votesParticipated === 0) return 0
+    const allPolls = JSON.parse(localStorage.getItem('allPolls') || '[]')
+    if (allPolls.length === 0) return 0
+    return Math.round((stats.votesParticipated / allPolls.length) * 100)
+  }
+
   return (
     <div className="page-content">
       <div className="profile-container">
@@ -18,15 +48,15 @@ const Profile = ({ user }) => {
           
           <div className="profile-stats">
             <div className="stat-item">
-              <span className="stat-number">12</span>
+              <span className="stat-number">{stats.votesParticipated}</span>
               <span className="stat-label">Votes Cast</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">3</span>
+              <span className="stat-number">{stats.votesCreated}</span>
               <span className="stat-label">Polls Created</span>
             </div>
             <div className="stat-item">
-              <span className="stat-number">98%</span>
+              <span className="stat-number">{calculateParticipation()}%</span>
               <span className="stat-label">Participation</span>
             </div>
           </div>
@@ -39,20 +69,18 @@ const Profile = ({ user }) => {
         
         <div className="recent-activity">
           <h3>Recent Activity</h3>
-          <div className="activity-list">
-            <div className="activity-item">
-              <span className="activity-text">Voted in "Favorite Programming Language"</span>
-              <span className="activity-time">2 hours ago</span>
+          {stats.activities.length === 0 ? (
+            <p style={{ color: '#666', textAlign: 'center', padding: '1rem' }}>No recent activity</p>
+          ) : (
+            <div className="activity-list">
+              {stats.activities.map((activity, index) => (
+                <div key={index} className="activity-item">
+                  <span className="activity-text">{activity.text}</span>
+                  <span className="activity-time">{activity.time}</span>
+                </div>
+              ))}
             </div>
-            <div className="activity-item">
-              <span className="activity-text">Created poll "Best Framework 2026"</span>
-              <span className="activity-time">1 day ago</span>
-            </div>
-            <div className="activity-item">
-              <span className="activity-text">Voted in "Preferred Development Environment"</span>
-              <span className="activity-time">3 days ago</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

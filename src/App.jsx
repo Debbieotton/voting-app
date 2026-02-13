@@ -68,10 +68,10 @@ function App() {
         return <SignIn onSignIn={handleSignIn} onNavigate={handleNavigate} />
       
       case 'home':
-        return <Home user={user} />
+        return <Home user={user} onNavigate={handleNavigate} />
       
       case 'vote':
-        return <Vote />
+        return <Vote user={user} />
       
       case 'profile':
         return <Profile user={user} />
@@ -86,7 +86,7 @@ function App() {
 
   return (
     <Layout
-      navbar={showNavbar ? <Navbar user={user} onSignOut={handleSignOutClick} onNavigate={handleNavigate} /> : null}
+      navbar={showNavbar ? <Navbar onSignOut={handleSignOutClick} onNavigate={handleNavigate} /> : null}
       footer={showFooter ? <Footer /> : null}
     >
       {renderPage()}

@@ -1,6 +1,7 @@
 import React from 'react'
+import { Button } from '../ui/Button'
 
-const Home = ({ user }) => {
+const Home = ({ user, onNavigate }) => {
   return (
     <div className="page-content">
       <div className="welcome-section">
@@ -8,7 +9,7 @@ const Home = ({ user }) => {
         <p>Use the navigation above to vote or manage your profile.</p>
       </div>
       <div className="features-grid">
-        <div className="feature-card">
+        <div className="feature-card" onClick={() => onNavigate('vote')} style={{ cursor: 'pointer' }}>
           <h3>🗳️ Voting</h3>
           <p>Participate in active polls and make your voice heard.</p>
         </div>
