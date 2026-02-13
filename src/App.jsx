@@ -1,34 +1,85 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import React, { useState } from 'react'
+import { useAuth } from './hooks/useAuth'
 import './App.css'
 
+import Layout from './components/layout/Layout'
+import Navbar from './components/layout/Navbar'
+import Footer from './components/layout/Footer'
+
+import Landing from './components/auth/Landing'
+import SignUp from './components/auth/SignUp'
+import SignIn from './components/auth/SignIn'
+
+import Home from './components/pages/Home'
+import Vote from './components/vote/Vote'
+import Profile from './components/pages/Profile'
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState('landing')
+  const { user, isAuthenticated, login, logout, register } = useAuth()
+
+  const handleSignUp = (userData) => {
+    register(userData)
+    setCurrentPage('signin')
+  }
+
+  const handleSignIn = (credentials) => {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+    
+    if (storedUser.email === credentials.email && storedUser.password === credentials.password) {
+      login(storedUser)
+      setCurrentPage('home')
+    } else {
+      alert('Invalid credentials')
+    }
+  }
+
+  const handleSignOut = () => {
+    if (window.confirm('Are you sure?')) {
+      logout()
+      setCurrentPage('landing')
+    }
+  }
+
+  const handleNavigate = (page) => {
+    setCurrentPage(page)
+  }
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'landing':
+        return <Landing onNavigate={handleNavigate} />
+      
+      case 'signup':
+        return <SignUp onSignUp={handleSignUp} onNavigate={handleNavigate} />
+      
+      case 'signin':
+        return <SignIn onSignIn={handleSignIn} onNavigate={handleNavigate} />
+      
+      case 'home':
+        return <Home user={user} />
+      
+      case 'vote':
+        return <Vote />
+      
+      case 'profile':
+        return <Profile user={user} />
+      
+      default:
+        return <Landing onNavigate={handleNavigate} />
+    }
+  }
+
+  const showNavbar = isAuthenticated && ['home', 'vote', 'profile'].includes(currentPage)
+  const showFooter = isAuthenticated
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <Layout
+      navbar={showNavbar ? <Navbar user={user} onSignOut={handleSignOut} onNavigate={handleNavigate} /> : null}
+      footer={showFooter ? <Footer /> : null}
+    >
+      {renderPage()}
+    </Layout>
   )
 }
 
