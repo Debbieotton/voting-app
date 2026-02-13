@@ -15,7 +15,11 @@ import Vote from './components/vote/Vote'
 import Profile from './components/pages/Profile'
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('landing')
+  const [currentPage, setCurrentPage] = useState(() => {
+    const currentUser = localStorage.getItem('currentUser')
+    return currentUser ? 'home' : 'landing'
+  })
+  const [showSignOutModal, setShowSignOutModal] = useState(false)
   const { user, isAuthenticated, login, logout, register } = useAuth()
 
   const handleSignUp = (userData) => {
@@ -34,11 +38,18 @@ function App() {
     }
   }
 
-  const handleSignOut = () => {
-    if (window.confirm('Are you sure?')) {
-      logout()
-      setCurrentPage('landing')
-    }
+  const handleSignOutClick = () => {
+    setShowSignOutModal(true)
+  }
+
+  const handleConfirmSignOut = () => {
+    logout()
+    setShowSignOutModal(false)
+    setCurrentPage('landing')
+  }
+
+  const handleCancelSignOut = () => {
+    setShowSignOutModal(false)
   }
 
   const handleNavigate = (page) => {
@@ -75,10 +86,27 @@ function App() {
 
   return (
     <Layout
-      navbar={showNavbar ? <Navbar user={user} onSignOut={handleSignOut} onNavigate={handleNavigate} /> : null}
+      navbar={showNavbar ? <Navbar user={user} onSignOut={handleSignOutClick} onNavigate={handleNavigate} /> : null}
       footer={showFooter ? <Footer /> : null}
     >
       {renderPage()}
+      
+      {showSignOutModal && (
+        <div className="modal-overlay" onClick={handleCancelSignOut}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Sign Out</h3>
+            <p>Are you sure you want to sign out?</p>
+            <div className="modal-buttons">
+              <button className="btn primary" onClick={handleConfirmSignOut}>
+                Yes
+              </button>
+              <button className="btn secondary" onClick={handleCancelSignOut}>
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

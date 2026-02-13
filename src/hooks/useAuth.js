@@ -5,9 +5,9 @@ export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    const currentUser = localStorage.getItem('currentUser')
+    if (currentUser) {
+      setUser(JSON.parse(currentUser))
       setIsAuthenticated(true)
     }
   }, [])

@@ -4,8 +4,13 @@ const Navbar = ({ user, onSignOut, onNavigate }) => {
   return (
     <nav className="navbar">
       <div className="nav-container">
-        <h1>Voting App</h1>
+        <h1 className="navbar-logo" onClick={() => onNavigate('home')}>
+          Voting App
+        </h1>
         <div className="nav-links">
+          <button className="nav-btn" onClick={() => onNavigate('home')}>
+            Home
+          </button>
           <button className="nav-btn" onClick={() => onNavigate('vote')}>
             Vote
           </button>
