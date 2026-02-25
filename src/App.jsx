@@ -13,6 +13,7 @@ import SignIn from './components/auth/SignIn'
 import Home from './components/pages/Home'
 import Vote from './components/vote/Vote'
 import Profile from './components/pages/Profile'
+import Results from './components/pages/Results'
 
 function App() {
   const [currentPage, setCurrentPage] = useState(() => {
@@ -76,12 +77,15 @@ function App() {
       case 'profile':
         return <Profile user={user} />
       
+      case 'results':
+        return <Results user={user} />
+      
       default:
         return <Landing onNavigate={handleNavigate} />
     }
   }
 
-  const showNavbar = isAuthenticated && ['home', 'vote', 'profile'].includes(currentPage)
+  const showNavbar = isAuthenticated && ['home', 'vote', 'profile', 'results'].includes(currentPage)
   const showFooter = isAuthenticated
 
   return (

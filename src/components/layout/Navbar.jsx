@@ -14,6 +14,9 @@ const Navbar = ({ onSignOut, onNavigate }) => {
           <button className="nav-btn" onClick={() => onNavigate('vote')}>
             Create Vote
           </button>
+          <button className="nav-btn" onClick={() => onNavigate('results')}>
+            Results
+          </button>
           <button className="nav-btn" onClick={() => onNavigate('profile')}>
             Profile
           </button>

@@ -17,9 +17,9 @@ const Home = ({ user, onNavigate }) => {
           <h3>👤 Profile</h3>
           <p>Manage your account settings and view your voting history.</p>
         </div>
-        <div className="feature-card">
+        <div className="feature-card" onClick={() => onNavigate('results')} style={{ cursor: 'pointer' }}>
           <h3>📊 Results</h3>
-          <p>View real-time results and statistics for ongoing polls.</p>
+          <p>View friends' polls and statistics.</p>
         </div>
       </div>
     </div>
