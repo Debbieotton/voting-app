@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from './hooks/useAuth'
 import './App.css'
 
@@ -16,31 +16,29 @@ import Profile from './components/pages/Profile'
 import Results from './components/pages/Results'
 
 function App() {
-  const [currentPage, setCurrentPage] = useState(() => {
-    const currentUser = localStorage.getItem('currentUser')
-    return currentUser ? 'home' : 'landing'
-  })
+  const [currentPage, setCurrentPage] = useState('landing')
   const [showSignOutModal, setShowSignOutModal] = useState(false)
   const { user, isAuthenticated, login, logout, register } = useAuth()
 
-  const handleSignUp = (userData) => {
+  useEffect(() => {
+    setCurrentPage(isAuthenticated ? 'home' : 'landing')
+  }, [isAuthenticated])
+
+  const handleSignUp = async (userData) => {
     try {
-      register(userData)
+      await register({ email: userData.email, password: userData.password })
       setCurrentPage('signin')
     } catch (error) {
       alert(error.message)
     }
   }
 
-  const handleSignIn = (credentials) => {
-    const userRegistry = JSON.parse(localStorage.getItem('userRegistry') || '{}')
-    const storedUser = userRegistry[credentials.email]
-    
-    if (storedUser && storedUser.email === credentials.email && storedUser.password === credentials.password) {
-      login(storedUser)
+  const handleSignIn = async (credentials) => {
+    try {
+      await login({ email: credentials.email, password: credentials.password })
       setCurrentPage('home')
-    } else {
-      alert('Invalid email or password')
+    } catch (error) {
+      alert(error.message)
     }
   }
 
@@ -48,10 +46,14 @@ function App() {
     setShowSignOutModal(true)
   }
 
-  const handleConfirmSignOut = () => {
-    logout()
-    setShowSignOutModal(false)
-    setCurrentPage('landing')
+  const handleConfirmSignOut = async () => {
+    try {
+      await logout()
+      setShowSignOutModal(false)
+      setCurrentPage('landing')
+    } catch (error) {
+      alert(error.message)
+    }
   }
 
   const handleCancelSignOut = () => {
@@ -66,25 +68,25 @@ function App() {
     switch (currentPage) {
       case 'landing':
         return <Landing onNavigate={handleNavigate} />
-      
+
       case 'signup':
         return <SignUp onSignUp={handleSignUp} onNavigate={handleNavigate} />
-      
+
       case 'signin':
         return <SignIn onSignIn={handleSignIn} onNavigate={handleNavigate} />
-      
+
       case 'home':
         return <Home user={user} onNavigate={handleNavigate} />
-      
+
       case 'vote':
         return <Vote user={user} />
-      
+
       case 'profile':
         return <Profile user={user} />
-      
+
       case 'results':
         return <Results user={user} />
-      
+
       default:
         return <Landing onNavigate={handleNavigate} />
     }
@@ -99,7 +101,7 @@ function App() {
       footer={showFooter ? <Footer /> : null}
     >
       {renderPage()}
-      
+
       {showSignOutModal && (
         <div className="modal-overlay" onClick={handleCancelSignOut}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

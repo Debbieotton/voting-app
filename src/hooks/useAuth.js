@@ -1,49 +1,58 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
 
 export const useAuth = () => {
-  const [user, setUser] = useState(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const currentUser = localStorage.getItem('currentUser')
-    if (currentUser) {
-      setUser(JSON.parse(currentUser))
-      setIsAuthenticated(true)
-    }
-  }, [])
+    supabase.auth.getSession().then(({ data }) => {
+      const sessionUser = data?.session?.user ?? null;
+      setUser(sessionUser);
+      setIsAuthenticated(!!sessionUser);
+    });
 
-  const login = (userData) => {
-    setUser(userData)
-    setIsAuthenticated(true)
-    localStorage.setItem('currentUser', JSON.stringify(userData))
-  }
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      setIsAuthenticated(!!sessionUser);
+    });
 
-  const logout = () => {
-    setUser(null)
-    setIsAuthenticated(false)
-    localStorage.removeItem('currentUser')
-  }
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
-  const register = (userData) => {
-    const userRegistry = JSON.parse(localStorage.getItem('userRegistry') || '{}')
-    
-    if (userRegistry[userData.email]) {
-      throw new Error('Email already registered')
-    }
-    
-    userRegistry[userData.email] = { 
-      username: userData.username, 
+  const register = async (userData) => {
+    const { data, error } = await supabase.auth.signUp({
       email: userData.email,
-      password: userData.password 
-    }
-    localStorage.setItem('userRegistry', JSON.stringify(userRegistry))
-  }
+      password: userData.password,
+    });
+
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  const login = async (credentials) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: credentials.email,
+      password: credentials.password,
+    });
+
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
+  };
 
   return {
     user,
     isAuthenticated,
     login,
     logout,
-    register
-  }
-}
+    register,
+  };
+};

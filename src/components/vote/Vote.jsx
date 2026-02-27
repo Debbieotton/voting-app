@@ -1,54 +1,75 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Button } from '../ui/Button'
+import { supabase } from '../../lib/supabase'
 
 const Vote = ({ user }) => {
   const [view, setView] = useState('list')
-  const [allPolls, setAllPolls] = useState([])
-  const [votes, setVotes] = useState({})
-  const [selectedCreator, setSelectedCreator] = useState(null)
-  
+  const [polls, setPolls] = useState([])
+  const [selected, setSelected] = useState({})
+  const [myVotes, setMyVotes] = useState({})
+  const [loading, setLoading] = useState(true)
+
   const [newPoll, setNewPoll] = useState({
     question: '',
     options: ['', '']
   })
 
-  useEffect(() => {
-    const storedPolls = JSON.parse(localStorage.getItem('allPolls') || '[]')
-    setAllPolls(storedPolls)
-    
-    const userVotes = JSON.parse(localStorage.getItem(`votes_${user?.email}`) || '{}')
-    setVotes(userVotes)
-  }, [user])
+  const userId = user?.id
+  const userEmail = user?.email
 
-  const savePollsToStorage = (polls) => {
-    localStorage.setItem('allPolls', JSON.stringify(polls))
-    setAllPolls(polls)
-  }
+  const pollsWithOptions = useMemo(() => {
+    return polls.map(p => ({
+      ...p,
+      options: (p.options || []).sort((a, b) => a.name.localeCompare(b.name))
+    }))
+  }, [polls])
 
-  const saveVotesToStorage = (newVotes) => {
-    localStorage.setItem(`votes_${user?.email}`, JSON.stringify(newVotes))
-    setVotes(newVotes)
-  }
+  const loadPolls = async () => {
+    setLoading(true)
 
-  const addActivity = (text) => {
-    const activities = JSON.parse(localStorage.getItem(`activities_${user?.email}`) || '[]')
-    const newActivity = {
-      text,
-      time: new Date().toLocaleString()
+    const { data: pollsData, error: pollsErr } = await supabase
+      .from('polls')
+      .select('id, question, created_by, creator_email, created_at, poll_options ( id, name )')
+      .order('created_at', { ascending: false })
+
+    if (pollsErr) {
+      alert(pollsErr.message)
+      setLoading(false)
+      return
     }
-    const updatedActivities = [newActivity, ...activities].slice(0, 10)
-    localStorage.setItem(`activities_${user?.email}`, JSON.stringify(updatedActivities))
+
+    const normalized = (pollsData || []).map(p => ({
+      ...p,
+      options: p.poll_options || []
+    }))
+
+    setPolls(normalized)
+
+    if (userId) {
+      const { data: votesData, error: votesErr } = await supabase
+        .from('votes')
+        .select('poll_id, option_id')
+        .eq('user_id', userId)
+
+      if (!votesErr) {
+        const map = {}
+        for (const v of votesData || []) map[v.poll_id] = v.option_id
+        setMyVotes(map)
+      }
+    }
+
+    setLoading(false)
   }
 
-  const handleViewChange = (newView) => {
-    setView(newView)
-    if (newView === 'list') setSelectedCreator(null)
-  }
+  useEffect(() => {
+    loadPolls()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   const handleOptionChange = (index, value) => {
-    const newOptions = [...newPoll.options]
-    newOptions[index] = value
-    setNewPoll({ ...newPoll, options: newOptions })
+    const next = [...newPoll.options]
+    next[index] = value
+    setNewPoll({ ...newPoll, options: next })
   }
 
   const addOption = () => {
@@ -56,132 +77,127 @@ const Vote = ({ user }) => {
   }
 
   const removeOption = (index) => {
-    if (newPoll.options.length > 2) {
-      const newOptions = newPoll.options.filter((_, i) => i !== index)
-      setNewPoll({ ...newPoll, options: newOptions })
-    }
+    if (newPoll.options.length <= 2) return
+    const next = newPoll.options.filter((_, i) => i !== index)
+    setNewPoll({ ...newPoll, options: next })
   }
 
-  const handleCreatePoll = () => {
-    if (!newPoll.question.trim()) {
+  const handleCreatePoll = async () => {
+    if (!userId) {
+      alert('Please sign in')
+      return
+    }
+
+    const question = newPoll.question.trim()
+    if (!question) {
       alert('Please enter a question')
       return
     }
-    
-    const validOptions = newPoll.options.filter(opt => opt.trim() !== '')
+
+    const validOptions = newPoll.options.map(o => o.trim()).filter(Boolean)
     if (validOptions.length < 2) {
       alert('Please enter at least 2 options')
       return
     }
 
-    const poll = {
-      id: Date.now().toString(),
-      question: newPoll.question,
-      options: validOptions.map((name, index) => ({ id: index + 1, name, votes: 0 })),
-      createdBy: user?.email,
-      createdAt: new Date().toISOString()
+    const { data: pollRow, error: pollErr } = await supabase
+      .from('polls')
+      .insert({
+        question,
+        created_by: userId,
+        creator_email: userEmail || null
+      })
+      .select('id')
+      .single()
+
+    if (pollErr) {
+      alert(pollErr.message)
+      return
     }
 
-    const updatedPolls = [...allPolls, poll]
-    savePollsToStorage(updatedPolls)
-    addActivity(`Created poll "${poll.question}"`)
-    
+    const pollId = pollRow.id
+    const optionRows = validOptions.map(name => ({ poll_id: pollId, name }))
+
+    const { error: optErr } = await supabase
+      .from('poll_options')
+      .insert(optionRows)
+
+    if (optErr) {
+      alert(optErr.message)
+      return
+    }
+
     setNewPoll({ question: '', options: ['', ''] })
     setView('list')
-  }
-
-  const handleVote = (pollId) => {
-    if (votes[pollId]?.selected) {
-      const poll = allPolls.find(p => p.id === pollId)
-      const selectedOption = poll?.options.find(o => o.id === votes[pollId].selected)
-      
-      const updatedPolls = allPolls.map(p => {
-        if (p.id === pollId) {
-          return {
-            ...p,
-            options: p.options.map(opt => 
-              opt.id === votes[pollId].selected 
-                ? { ...opt, votes: opt.votes + 1 }
-                : opt
-            )
-          }
-        }
-        return p
-      })
-      
-      savePollsToStorage(updatedPolls)
-      saveVotesToStorage({
-        ...votes,
-        [pollId]: { ...votes[pollId], hasVoted: true }
-      })
-      addActivity(`Voted for "${selectedOption?.name}" in "${poll?.question}"`)
-    }
+    await loadPolls()
   }
 
   const handleSelect = (pollId, optionId) => {
-    saveVotesToStorage({
-      ...votes,
-      [pollId]: { ...votes[pollId], selected: optionId }
+    setSelected(prev => ({ ...prev, [pollId]: optionId }))
+  }
+
+  const handleVote = async (poll) => {
+    if (!userId) {
+      alert('Please sign in')
+      return
+    }
+
+    if (poll.created_by === userId) {
+      alert("You can't vote on your own poll")
+      return
+    }
+
+    if (myVotes[poll.id]) {
+      alert("You've already voted on this poll")
+      return
+    }
+
+    const optionId = selected[poll.id]
+    if (!optionId) {
+      alert('Select an option first')
+      return
+    }
+
+    const { error: voteErr } = await supabase
+      .from('votes')
+      .insert({
+        poll_id: poll.id,
+        option_id: optionId,
+        user_id: userId,
+        voter_email: userEmail || null
+      })
+
+    if (voteErr) {
+      const msg = voteErr.message?.toLowerCase() || ''
+      if (msg.includes('duplicate') || msg.includes('unique')) {
+        alert("You've already voted on this poll")
+      } else if (msg.includes('row-level security')) {
+        alert("You can't vote on your own poll")
+      } else {
+        alert(voteErr.message)
+      }
+      return
+    }
+
+    await supabase.from('earnings').insert({
+      user_id: userId,
+      reason: 'vote_cast',
+      amount: 1,
+      poll_id: poll.id
     })
+
+    setMyVotes(prev => ({ ...prev, [poll.id]: optionId }))
+    await loadPolls()
+    alert('Vote submitted! +1 token')
   }
 
-  const handleDeletePoll = (pollId) => {
-    const updatedPolls = allPolls.filter(p => p.id !== pollId)
-    savePollsToStorage(updatedPolls)
-  }
-
-  const handleViewCreatorProfile = (email) => {
-    setSelectedCreator(email)
-  }
-
-  const getTotalVotes = (options) => {
-    return options.reduce((sum, option) => sum + option.votes, 0)
-  }
-
-  const getUserDisplayName = (email) => {
-    const users = JSON.parse(localStorage.getItem('userRegistry') || '{}')
-    return users[email]?.username || email.split('@')[0]
-  }
-
-  const renderUserProfile = (email) => {
-    const allPolls = JSON.parse(localStorage.getItem('allPolls') || '[]')
-    const userVotes = JSON.parse(localStorage.getItem(`votes_${email}`) || '{}')
-    
-    const pollsCreated = allPolls.filter(p => p.createdBy === email).length
-    const votesParticipated = Object.values(userVotes).filter(v => v.hasVoted).length
-    
-    return (
-      <div className="profile-card">
-        <div className="profile-header">
-          <div className="avatar">
-            {getUserDisplayName(email).charAt(0).toUpperCase()}
-          </div>
-          <div className="user-info">
-            <h3>{getUserDisplayName(email)}</h3>
-            <p>{email}</p>
-          </div>
-        </div>
-        
-        <div className="profile-stats">
-          <div className="stat-item">
-            <span className="stat-number">{votesParticipated}</span>
-            <span className="stat-label">Votes Cast</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{pollsCreated}</span>
-            <span className="stat-label">Polls Created</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-number">{allPolls.length > 0 ? Math.round((votesParticipated / allPolls.length) * 100) : 0}%</span>
-            <span className="stat-label">Participation</span>
-          </div>
-        </div>
-
-        <Button className="secondary" onClick={() => setSelectedCreator(null)}>
-          Back to Polls
-        </Button>
-      </div>
-    )
+  const handleDeletePoll = async (pollId) => {
+    const { error } = await supabase.from('polls').delete().eq('id', pollId)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    await loadPolls()
   }
 
   const renderCreatePoll = () => (
@@ -196,7 +212,7 @@ const Vote = ({ user }) => {
             value={newPoll.question}
             onChange={(e) => setNewPoll({ ...newPoll, question: e.target.value })}
           />
-          
+
           <div className="poll-options">
             <label style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'block' }}>Options:</label>
             {newPoll.options.map((option, index) => (
@@ -237,39 +253,38 @@ const Vote = ({ user }) => {
     <div className="vote-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2>Active Polls</h2>
-        <Button className="primary" onClick={() => handleViewChange('create')}>
+        <Button className="primary" onClick={() => setView('create')}>
           + Create Poll
         </Button>
       </div>
-      
-      {allPolls.length === 0 ? (
+
+      {loading ? (
+        <div className="poll-card" style={{ textAlign: 'center' }}>
+          <p style={{ color: '#666' }}>Loading polls...</p>
+        </div>
+      ) : pollsWithOptions.length === 0 ? (
         <div className="poll-card" style={{ textAlign: 'center' }}>
           <p style={{ color: '#666', marginBottom: '1rem' }}>No polls created yet.</p>
-          <Button className="primary" onClick={() => handleViewChange('create')}>
+          <Button className="primary" onClick={() => setView('create')}>
             Create Your First Poll
           </Button>
         </div>
       ) : (
-        allPolls.map((poll) => {
-          const totalVotes = getTotalVotes(poll.options)
-          const pollState = votes[poll.id] || { selected: null, hasVoted: false }
-          const isCreator = poll.createdBy === user?.email
-          
+        pollsWithOptions.map((poll) => {
+          const myChoice = myVotes[poll.id]
+          const isCreator = poll.created_by === userId
+          const canVote = !!userId && !isCreator && !myChoice
+
           return (
             <div key={poll.id} className="poll-card">
               <div className="poll-question">
                 <h3>{poll.question}</h3>
                 <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.5rem' }}>
-                  Created by: <span 
-                    style={{ color: '#667eea', cursor: 'pointer', textDecoration: 'underline' }}
-                    onClick={() => handleViewCreatorProfile(poll.createdBy)}
-                  >
-                    {getUserDisplayName(poll.createdBy)}
-                  </span>
+                  Created by: {poll.creator_email || 'Unknown'}
                 </p>
                 {isCreator && (
-                  <button 
-                    className="btn secondary" 
+                  <button
+                    className="btn secondary"
                     style={{ marginTop: '0.5rem', padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
                     onClick={() => handleDeletePoll(poll.id)}
                   >
@@ -277,47 +292,39 @@ const Vote = ({ user }) => {
                   </button>
                 )}
               </div>
-              
-              {!pollState.hasVoted ? (
+
+              {!myChoice ? (
                 <div className="poll-options">
                   {poll.options.map((option) => (
                     <div
                       key={option.id}
-                      className={`poll-option ${pollState.selected === option.id ? 'selected' : ''}`}
-                      onClick={() => handleSelect(poll.id, option.id)}
+                      className={`poll-option ${selected[poll.id] === option.id ? 'selected' : ''}`}
+                      onClick={() => canVote && handleSelect(poll.id, option.id)}
+                      style={{ opacity: canVote ? 1 : 0.6, cursor: canVote ? 'pointer' : 'not-allowed' }}
                     >
                       <span className="option-text">{option.name}</span>
                     </div>
                   ))}
-                  <Button 
-                    className="primary large" 
-                    onClick={() => handleVote(poll.id)}
-                    disabled={!pollState.selected}
+
+                  <Button
+                    className="primary large"
+                    onClick={() => handleVote(poll)}
+                    disabled={!canVote || !selected[poll.id]}
                   >
                     Submit Vote
                   </Button>
+
+                  {isCreator && (
+                    <p style={{ marginTop: '0.75rem', color: '#666' }}>
+                      You can’t vote on polls you created.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="poll-results">
                   <h4>Results</h4>
-                  {poll.options.map((option) => {
-                    const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0
-                    return (
-                      <div key={option.id} className="result-bar">
-                        <div className="result-info">
-                          <span className="result-name">{option.name}</span>
-                          <span className="result-count">{option.votes} votes ({percentage.toFixed(1)}%)</span>
-                        </div>
-                        <div className="progress-bar">
-                          <div 
-                            className="progress-fill" 
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  <p className="total-votes">Total votes: {totalVotes}</p>
+                  <PollResults pollId={poll.id} options={poll.options} />
+                  <p className="total-votes">Your vote has been recorded.</p>
                 </div>
               )}
             </div>
@@ -329,13 +336,55 @@ const Vote = ({ user }) => {
 
   return (
     <div className="page-content">
-      {view === 'create' ? renderCreatePoll() : selectedCreator ? (
-        <div className="vote-container">
-          <h2>User Profile</h2>
-          {renderUserProfile(selectedCreator)}
-        </div>
-      ) : renderPollList()}
+      {view === 'create' ? renderCreatePoll() : renderPollList()}
     </div>
+  )
+}
+
+const PollResults = ({ pollId, options }) => {
+  const [counts, setCounts] = useState({})
+  const [total, setTotal] = useState(0)
+
+  useEffect(() => {
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('votes')
+        .select('option_id')
+        .eq('poll_id', pollId)
+
+      if (error) return
+
+      const map = {}
+      for (const o of options) map[o.id] = 0
+      for (const v of data || []) map[v.option_id] = (map[v.option_id] || 0) + 1
+
+      const t = Object.values(map).reduce((a, b) => a + b, 0)
+      setCounts(map)
+      setTotal(t)
+    }
+
+    load()
+  }, [pollId, options])
+
+  return (
+    <>
+      {options.map((option) => {
+        const votes = counts[option.id] || 0
+        const percentage = total > 0 ? (votes / total) * 100 : 0
+        return (
+          <div key={option.id} className="result-bar">
+            <div className="result-info">
+              <span className="result-name">{option.name}</span>
+              <span className="result-count">{votes} votes ({percentage.toFixed(1)}%)</span>
+            </div>
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${percentage}%` }}></div>
+            </div>
+          </div>
+        )
+      })}
+      <p className="total-votes">Total votes: {total}</p>
+    </>
   )
 }
 
