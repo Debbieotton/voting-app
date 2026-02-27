@@ -24,18 +24,23 @@ function App() {
   const { user, isAuthenticated, login, logout, register } = useAuth()
 
   const handleSignUp = (userData) => {
-    register(userData)
-    setCurrentPage('signin')
+    try {
+      register(userData)
+      setCurrentPage('signin')
+    } catch (error) {
+      alert(error.message)
+    }
   }
 
   const handleSignIn = (credentials) => {
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+    const userRegistry = JSON.parse(localStorage.getItem('userRegistry') || '{}')
+    const storedUser = userRegistry[credentials.email]
     
-    if (storedUser.email === credentials.email && storedUser.password === credentials.password) {
+    if (storedUser && storedUser.email === credentials.email && storedUser.password === credentials.password) {
       login(storedUser)
       setCurrentPage('home')
     } else {
-      alert('Invalid credentials')
+      alert('Invalid email or password')
     }
   }
 

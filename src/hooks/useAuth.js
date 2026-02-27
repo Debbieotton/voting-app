@@ -25,10 +25,17 @@ export const useAuth = () => {
   }
 
   const register = (userData) => {
-    localStorage.setItem('user', JSON.stringify(userData))
-    
     const userRegistry = JSON.parse(localStorage.getItem('userRegistry') || '{}')
-    userRegistry[userData.email] = { username: userData.username, email: userData.email }
+    
+    if (userRegistry[userData.email]) {
+      throw new Error('Email already registered')
+    }
+    
+    userRegistry[userData.email] = { 
+      username: userData.username, 
+      email: userData.email,
+      password: userData.password 
+    }
     localStorage.setItem('userRegistry', JSON.stringify(userRegistry))
   }
 
