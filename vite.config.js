@@ -9,6 +9,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
+
+      // 🔥 THIS IS THE FIX
+      devOptions: {
+        enabled: false
+      },
+
       manifest: {
         name: "Voting App",
         short_name: "VoteApp",
