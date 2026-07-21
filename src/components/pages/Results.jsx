@@ -192,7 +192,6 @@ const PollResults = ({ pollId, options }) => {
         .eq('poll_id', pollId)
 
       if (error) return
-
       const map = {}
       for (const o of options) map[o.id] = 0
       for (const v of data || []) map[v.option_id] = (map[v.option_id] || 0) + 1

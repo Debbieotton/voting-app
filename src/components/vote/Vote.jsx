@@ -191,8 +191,12 @@ const Vote = ({ user }) => {
     alert('Vote submitted! +1 token')
   }
 
-  const handleDeletePoll = async (pollId) => {
-    const { error } = await supabase.from('polls').delete().eq('id', pollId)
+  const handleDeletePoll = async (pollId, creatorId) => {
+    if (creatorId !== userId) {
+      alert("You can only delete your own polls")
+      return
+    }
+    const { error } = await supabase.from('polls').delete().eq('id', pollId).eq('created_by', userId)
     if (error) {
       alert(error.message)
       return
@@ -286,7 +290,7 @@ const Vote = ({ user }) => {
                   <button
                     className="btn secondary"
                     style={{ marginTop: '0.5rem', padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
-                    onClick={() => handleDeletePoll(poll.id)}
+                    onClick={() => handleDeletePoll(poll.id, poll.created_by)}
                   >
                     Delete
                   </button>

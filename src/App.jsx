@@ -26,7 +26,7 @@ function App() {
 
   const handleSignUp = async (userData) => {
     try {
-      await register({ email: userData.email, password: userData.password })
+      await register({ email: userData.email, password: userData.password, username: userData.username })
       setCurrentPage('signin')
     } catch (error) {
       alert(error.message)

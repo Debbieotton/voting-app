@@ -5,7 +5,7 @@ const Home = ({ user, onNavigate }) => {
   return (
     <div className="page-content">
       <div className="welcome-section">
-        <h2>Welcome, {user?.username}!</h2>
+        <h2>Welcome, {user?.user_metadata?.username || user?.email}!</h2>
         <p>Use the navigation above to vote or manage your profile.</p>
       </div>
       <div className="features-grid">

@@ -1,34 +1,38 @@
 import React, { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 
 const Profile = ({ user }) => {
   const [stats, setStats] = useState({
     votesCreated: 0,
-    votesParticipated: 0,
-    activities: []
+    votesParticipated: 0
   })
 
   useEffect(() => {
-    if (user?.email) {
-      const allPolls = JSON.parse(localStorage.getItem('allPolls') || '[]')
-      const userVotes = JSON.parse(localStorage.getItem(`votes_${user.email}`) || '{}')
-      const activities = JSON.parse(localStorage.getItem(`activities_${user.email}`) || '[]')
-      
-      const votesCreated = allPolls.filter(p => p.createdBy === user.email).length
-      const votesParticipated = Object.values(userVotes).filter(v => v.hasVoted).length
+    if (!user?.id) return
+
+    const loadStats = async () => {
+      const { count: created } = await supabase
+        .from('polls')
+        .select('*', { count: 'exact', head: true })
+        .eq('created_by', user.id)
+
+      const { count: participated } = await supabase
+        .from('votes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
 
       setStats({
-        votesCreated,
-        votesParticipated,
-        activities
+        votesCreated: created || 0,
+        votesParticipated: participated || 0
       })
     }
+
+    loadStats()
   }, [user])
 
   const calculateParticipation = () => {
     if (stats.votesCreated === 0 && stats.votesParticipated === 0) return 0
-    const allPolls = JSON.parse(localStorage.getItem('allPolls') || '[]')
-    if (allPolls.length === 0) return 0
-    return Math.round((stats.votesParticipated / allPolls.length) * 100)
+    return Math.round((stats.votesParticipated / (stats.votesCreated + stats.votesParticipated || 1)) * 100)
   }
 
   return (
@@ -38,10 +42,10 @@ const Profile = ({ user }) => {
         <div className="profile-card">
           <div className="profile-header">
             <div className="avatar">
-              {user?.username?.charAt(0).toUpperCase() || 'U'}
+              {(user?.user_metadata?.username?.charAt(0).toUpperCase()) || (user?.email?.charAt(0).toUpperCase()) || 'U'}
             </div>
             <div className="user-info">
-              <h3>{user?.username}</h3>
+              <h3>{user?.user_metadata?.username || user?.email}</h3>
               <p>{user?.email}</p>
             </div>
           </div>
@@ -69,18 +73,11 @@ const Profile = ({ user }) => {
         
         <div className="recent-activity">
           <h3>Recent Activity</h3>
-          {stats.activities.length === 0 ? (
-            <p style={{ color: '#666', textAlign: 'center', padding: '1rem' }}>No recent activity</p>
-          ) : (
-            <div className="activity-list">
-              {stats.activities.map((activity, index) => (
-                <div key={index} className="activity-item">
-                  <span className="activity-text">{activity.text}</span>
-                  <span className="activity-time">{activity.time}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <p style={{ color: '#666', textAlign: 'center', padding: '1rem' }}>
+            {stats.votesParticipated > 0
+              ? `You have participated in ${stats.votesParticipated} vote(s) and created ${stats.votesCreated} poll(s).`
+              : 'No recent activity'}
+          </p>
         </div>
       </div>
     </div>
